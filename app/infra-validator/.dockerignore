@@ -1,0 +1,26 @@
+# Version Control
+.git
+.gitignore
+
+# Dependencies (Installed locally)
+node_modules/
+vendor/
+.venv/
+
+# Build Outputs & Cache
+dist/
+build/
+.next/
+.cache/
+*.pyc
+
+# Local Configs & Sensitive Data
+.env
+.env.*
+*.local
+secrets/
+id_rsa
+
+# Docker configs themselves
+Dockerfile
+.dockerignore

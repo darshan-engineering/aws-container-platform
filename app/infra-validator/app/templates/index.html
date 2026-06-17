@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Inter, Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: auto;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card h2 {
+            margin-bottom: 15px;
+        }
+
+        .status-good {
+            color: #22c55e;
+            font-weight: bold;
+        }
+
+        .status-bad {
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        .status-neutral {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+
+        .item {
+            margin-bottom: 10px;
+        }
+
+        code {
+            word-break: break-all;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>{{ app_name }}</h1>
+
+        <div class="subtitle">
+            ECS Reference Architecture Validation Dashboard
+        </div>
+
+        <div class="grid">
+
+            <div class="card">
+
+                <h2>Application</h2>
+
+                <div class="item">
+                    Version:
+                    <strong>{{ version }}</strong>
+                </div>
+
+                <div class="item">
+                    Region:
+                    <strong>{{ region }}</strong>
+                </div>
+
+            </div>
+
+            <div class="card">
+
+                <h2>ECS Metadata</h2>
+
+                {% if metadata.running_in_ecs %}
+
+                <div class="item">
+                    ECS:
+                    <span class="status-good">CONNECTED</span>
+                </div>
+
+                <div class="item">
+                    AZ:
+                    <strong>{{ metadata.availability_zone }}</strong>
+                </div>
+
+                <div class="item">
+                    Family:
+                    <strong>{{ metadata.family }}</strong>
+                </div>
+
+                <div class="item">
+                    Revision:
+                    <strong>{{ metadata.revision }}</strong>
+                </div>
+
+                <div class="item">
+                    Task ARN:
+                    <code>{{ metadata.task_arn }}</code>
+                </div>
+
+                {% else %}
+
+                <span class="status-neutral">
+                    Not Running In ECS
+                </span>
+
+                {% endif %}
+
+            </div>
+
+            <div class="card">
+
+                <h2>RDS</h2>
+
+                {% if health.rds.status == "healthy" %}
+                <span class="status-good">CONNECTED</span>
+                {% elif health.rds.status == "not_configured" %}
+                <span class="status-neutral">NOT CONFIGURED</span>
+                {% else %}
+                <span class="status-bad">FAILED</span>
+                {% endif %}
+
+            </div>
+
+            <div class="card">
+
+                <h2>DynamoDB</h2>
+
+                {% if health.dynamodb.status == "healthy" %}
+                <span class="status-good">CONNECTED</span>
+                {% elif health.dynamodb.status == "not_configured" %}
+                <span class="status-neutral">NOT CONFIGURED</span>
+                {% else %}
+                <span class="status-bad">FAILED</span>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>

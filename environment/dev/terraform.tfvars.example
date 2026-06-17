@@ -1,1 +1,4 @@
-route53_zone_id = "" # The one you get in the output after running bootstrap dir
+# Copy this file to terraform.tfvars and fill in your values.
+
+route53_zone_id = ""            # The one you get in the output after running bootstrap dir
+rds_db_password = "change-me"   # RDS password

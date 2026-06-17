@@ -31,3 +31,5 @@ override.tf.json
 # Include hcl lock files in version control (Recommended by HashiCorp)
 !.terraform.lock.hcl
 *.binary
+
+venv
