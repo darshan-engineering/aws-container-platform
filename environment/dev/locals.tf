@@ -12,10 +12,10 @@ locals {
   azs            = slice(data.aws_availability_zones.available.names, 0, 2)
   container_port = 80
 
-  ecr_repository_name = "sample-app"
+  ecr_repository_name = "infra-validator-app"
 
   ecs_cluster_name         = "${local.project}-${local.environment}-ecs-cluster"
-  # container_image          = "${module.ecr.repository_url}:latest"
+  container_image          = "${module.ecr.repository_url}:latest"
   desired                  = 2 # Keep desired '0' at  first run, push image to `ecr` then do it '2' and again `terraform apply`
   autoscaling_min_capacity = 1
   autoscaling_max_capacity = 4

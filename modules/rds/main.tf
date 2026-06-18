@@ -1,16 +1,6 @@
-# Create a dedicated subnet group in public subnets when testing with public access
-resource "aws_db_subnet_group" "public" {
-  count       = length(var.public_subnet_ids) > 0 ? 1 : 0
-  name        = "${var.rds_db_name}-public-subnet-group"
-  subnet_ids  = var.public_subnet_ids
-  description = "Public subnet group for RDS testing"
-  tags        = var.tags
-}
-
 module "mysql" {
   source  = "terraform-aws-modules/rds/aws"
   version = "~> 7.0.0"
-
 
   identifier = var.rds_db_name
 
@@ -29,12 +19,12 @@ module "mysql" {
   username = "myuser"
   port     = 3306
 
-  manage_master_user_password = true
+  manage_master_user_password = true # Automatically Stores the password in Secrets Manager
   password_wo                 = var.rds_db_password
   password_wo_version         = 1
 
-  multi_az = var.tags.Environment == "dev" ? false : true
-  db_subnet_group_name = length(var.public_subnet_ids) > 0 ? aws_db_subnet_group.public[0].name : var.database_subnet_group
+  multi_az               = var.tags.Environment == "dev" ? false : true
+  db_subnet_group_name   = var.database_subnet_group
   vpc_security_group_ids = [var.db_sg_id]
 
   maintenance_window              = "Mon:00:00-Mon:03:00"

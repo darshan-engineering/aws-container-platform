@@ -18,12 +18,6 @@ variable "database_subnet_group" {
   type        = string
 }
 
-variable "public_subnet_ids" {
-  description = "Public subnet IDs — used to create a public DB subnet group for testing"
-  type        = list(string)
-  default     = []
-}
-
 variable "publicly_accessible" {
   description = "Whether RDS should be publicly accessible (testing only)"
   type        = bool

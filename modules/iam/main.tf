@@ -24,6 +24,7 @@ module "ecs_task_policy" {
         Sid    = "DynamoDB"
         Effect = "Allow"
         Action = [
+          "dynamodb:DescribeTable",
           "dynamodb:GetItem",
           "dynamodb:PutItem",
           "dynamodb:UpdateItem",

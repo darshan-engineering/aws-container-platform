@@ -10,11 +10,9 @@ def check_dynamodb():
         }
 
     try:
-        dynamodb = boto3.resource("dynamodb")
-        table = dynamodb.Table(
-            settings.DYNAMODB_TABLE
-        )
-        table.load()
+        dynamodb = boto3.resource("dynamodb", region_name=settings.AWS_REGION)
+        table = dynamodb.Table(settings.DYNAMODB_TABLE)
+        table.load()  # calls DescribeTable
         return {
             "configured": True,
             "status": "healthy",

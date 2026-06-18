@@ -22,10 +22,15 @@ ALB  ──── HTTP → HTTPS redirect (port 80 → 443)
 Target Group (IP-based, health check /)
    │
    ▼
-ECS Fargate Service (private subnets, auto-scaling)
+ECS Fargate Task (private subnets, auto-scaling)
+   │  infra-validator-app
+   │  ├── pulls image ◄──────────────── ECR
+   │  ├── reads secret ◄─────────────── Secrets Manager (RDS password)
+   │  ├── connects ────────────────────► RDS MySQL (database subnets)
+   │  └── connects ────────────────────► DynamoDB (via NAT → AWS API)
    │
-   ▼
-ECR (container image registry)
+   IAM Task Role (DynamoDB + Secrets Manager)
+   IAM Exec Role (ECR pull + CloudWatch + Secrets Manager)
 ```
 
 **Modules**
@@ -33,12 +38,15 @@ ECR (container image registry)
 | Module      | Purpose                                                  |
 | ----------- | -------------------------------------------------------- |
 | `bootstrap` | One-time setup — S3 backend bucket + Route53 hosted zone |
-| `vpc`       | VPC, public/private subnets, NAT gateway                 |
-| `sg`        | Security groups for ALB and ECS tasks                    |
+| `vpc`       | VPC, public/private/database subnets, NAT gateway        |
+| `sg`        | Security groups for ALB, ECS tasks, and RDS              |
 | `acm`       | ACM TLS certificate with Route53 DNS validation          |
 | `alb`       | Application Load Balancer, listeners, target group       |
 | `ecr`       | ECR private repository                                   |
 | `ecs`       | ECS cluster, Fargate service, auto-scaling               |
+| `iam`       | Task role + policy (DynamoDB + Secrets Manager access)   |
+| `rds`       | RDS MySQL, Secrets Manager-managed password              |
+| `dynamodb`  | DynamoDB table (PAY_PER_REQUEST)                         |
 | `route53`   | A records pointing domain → ALB                          |
 | `waf`       | WAF v2 Web ACL attached to ALB                           |
 
@@ -143,12 +151,12 @@ This provisions everything: VPC, ALB, ECS cluster, ECR repo, WAF, ACM cert, DNS 
 Note the `repository_url` from the outputs:
 
 ```
-repository_url = "590183956795.dkr.ecr.ap-south-1.amazonaws.com/sample-app"
+repository_url = "590183956795.dkr.ecr.ap-south-1.amazonaws.com/infra-validator-app"
 ```
 
 ---
 
-### Step 4 — Build and push your container image to ECR
+### Step 4 — Build and push the container image to ECR
 
 ```bash
 # Authenticate Docker to ECR
@@ -156,13 +164,16 @@ aws ecr get-login-password --region ap-south-1 \
   | docker login --username AWS --password-stdin \
     590183956795.dkr.ecr.ap-south-1.amazonaws.com
 
-# Tag it
-docker tag nginx:latest \
-  590183956795.dkr.ecr.ap-south-1.amazonaws.com/sample-app:latest
+# Build
+docker build -t infra-validator-app ./app/infra-validator
 
-# Push it
+# Tag
+docker tag infra-validator-app:latest \
+  590183956795.dkr.ecr.ap-south-1.amazonaws.com/infra-validator-app:latest
+
+# Push
 docker push \
-  590183956795.dkr.ecr.ap-south-1.amazonaws.com/sample-app:latest
+  590183956795.dkr.ecr.ap-south-1.amazonaws.com/infra-validator-app:latest
 ```
 
 ![ECR operations](docs/assets/ecr_operations.png)
@@ -185,9 +196,31 @@ Then apply again:
 terraform apply
 ```
 
-![Apply after changing desired count](docs/assets/apply_after_changing_desired_count.png)
-
 ECS will pull the image from ECR, register the tasks with the target group, and start serving traffic.
+
+---
+
+### Updating the image (subsequent deploys)
+
+ECS does **not** automatically detect when a new image is pushed to ECR. After every push you must force a redeployment:
+
+```bash
+# 1. Build, tag, and push the new image
+docker build -t infra-validator-app:v1.0.0 ./app/infra-validator
+docker tag infra-validator-app:v1.0.0 \
+  590183956795.dkr.ecr.ap-south-1.amazonaws.com/infra-validator-app:latest
+docker push \
+  590183956795.dkr.ecr.ap-south-1.amazonaws.com/infra-validator-app:latest
+
+# 2. Force ECS to replace running tasks with the new image
+aws ecs update-service \
+  --cluster my-demo-proj-dev-ecs-cluster-cluster \
+  --service app \
+  --force-new-deployment \
+  --region ap-south-1
+```
+
+ECS performs a rolling replacement — new tasks start with the latest image, old tasks drain and stop. In a future release this step will be automated via a CI/CD pipeline.
 
 ---
 
@@ -203,15 +236,6 @@ The app should be live and served over HTTPS.
 
 ![App running](docs/assets/web_working.png)
 
-**Console verification**
-
-ECS service with tasks running and registered to the target group:
-
-![ECS console](docs/assets/console/ecs.png)
-
-Target group showing healthy targets:
-
-![Target group console](docs/assets/console/target_group.png)
 
 ---
 
@@ -248,18 +272,18 @@ aws-container-platform/
 
 Key values are set in `environment/dev/locals.tf`:
 
-| Local                      | Description                           | Default        |
-| -------------------------- | ------------------------------------- | -------------- |
-| `project`                  | Project name prefix for all resources | `my-demo-proj` |
-| `environment`              | Environment label                     | `dev`          |
-| `vpc_cidr`                 | VPC CIDR block                        | `10.0.0.0/16`  |
-| `container_port`           | Port the container listens on         | `80`           |
-| `ecr_repository_name`      | ECR repo name                         | `sample-app`   |
-| `desired`                  | Number of ECS tasks                   | `2`            |
-| `cpu`                      | Fargate task CPU units                | `256`          |
-| `memory`                   | Fargate task memory (MiB)             | `512`          |
-| `autoscaling_min_capacity` | Minimum tasks                         | `1`            |
-| `autoscaling_max_capacity` | Maximum tasks                         | `4`            |
+| Local                      | Description                           | Default               |
+| -------------------------- | ------------------------------------- | --------------------- |
+| `project`                  | Project name prefix for all resources | `my-demo-proj`        |
+| `environment`              | Environment label                     | `dev`                 |
+| `vpc_cidr`                 | VPC CIDR block                        | `10.0.0.0/16`         |
+| `container_port`           | Port the container listens on         | `80`                  |
+| `ecr_repository_name`      | ECR repo name                         | `infra-validator-app` |
+| `desired`                  | Number of ECS tasks                   | `2`                   |
+| `cpu`                      | Fargate task CPU units                | `256`                 |
+| `memory`                   | Fargate task memory (MiB)             | `512`                 |
+| `autoscaling_min_capacity` | Minimum tasks                         | `1`                   |
+| `autoscaling_max_capacity` | Maximum tasks                         | `4`                   |
 
 Auto-scaling triggers:
 
@@ -271,8 +295,9 @@ WAF rules applied (in priority order):
 1. Rate limit — block IPs exceeding 1000 req / 5 min
 2. AWS Managed Common Rule Set (XSS, HTTP anomalies, scanners)
 3. Known Bad Inputs (log4j, Spring4Shell, etc.)
-4. Linux Rule Set
-5. Amazon IP Reputation List
+4. SQL Injection Rule Set
+5. Linux Rule Set
+6. Amazon IP Reputation List
 
 ---
 
@@ -281,7 +306,8 @@ WAF rules applied (in priority order):
 Detailed configuration reference for individual modules:
 
 - [ECR — image types, tag mutability, lifecycle policy, scanning](docs/ecr.md)
-- [ECS — IAM roles, task definition, ALB integration, auto-scaling](docs/ecs.md)
+- [ECS — IAM roles, secrets, task definition, ALB integration, auto-scaling](docs/ecs.md)
+- [RDS — MySQL setup, Secrets Manager password management, networking](docs/rds.md)
 
 ---
 

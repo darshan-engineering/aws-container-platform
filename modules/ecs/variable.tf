@@ -74,3 +74,34 @@ variable "autoscaling_max_capacity" {
   default     = 5
   description = "Maximum number of ECS tasks."
 }
+
+variable "ecs_task_role_arn" {
+  type        = string
+  description = "ECS Task Role ARN"
+}
+
+variable "aws_region" {
+  type = string
+}
+
+variable "rds_db_host" {
+  type = string
+}
+
+variable "rds_db_name" {
+  type = string
+}
+
+variable "rds_db_user" {
+  type        = string
+  description = "ECS Task Role ARN"
+}
+
+variable "dynamodb_table_name" {
+  type = string
+}
+
+variable "rds_secret_arn" {
+  description = "RDS Password Secred ARN"
+  type = string
+}

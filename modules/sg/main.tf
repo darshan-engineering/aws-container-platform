@@ -2,7 +2,7 @@ module "ecs_sg" {
   source  = "terraform-aws-modules/security-group/aws"
   version = "~> 6.0.0"
 
-  name        = "${var.tags.Project}-${var.tags.Environment}-app-sg"
+  name        = "${var.tags.Project}-${var.tags.Environment}-ecs-sg"
   description = "Security group for ${var.tags.Project}-${var.tags.Environment} EC2 app instances"
   vpc_id      = var.vpc_id
 
@@ -46,7 +46,7 @@ module "alb_sg" {
   source  = "terraform-aws-modules/security-group/aws"
   version = "~> 6.0.0"
 
-  name        = "${var.tags.Project}-${var.tags.Environment}-app-sg"
+  name        = "${var.tags.Project}-${var.tags.Environment}-alb-sg"
   description = "Security group for ${var.tags.Project}-${var.tags.Environment} EC2 app instances"
   vpc_id      = var.vpc_id
 
@@ -92,12 +92,11 @@ module "rds_sg" {
 
   ingress_rules = {
     http = {
-      from_port   = 3306
-      to_port     = 3306
-      ip_protocol = "tcp"
-      # referenced_security_group_id = module.ecs_sg.id # only allow traffic from the app security group
-      cidr_ipv4   = "0.0.0.0/0"
-      description = "HTTP from Apps Only"
+      from_port                    = 3306
+      to_port                      = 3306
+      ip_protocol                  = "tcp"
+      referenced_security_group_id = module.ecs_sg.id # only allow traffic from the app security group
+      description                  = "HTTP from Apps Only"
     }
 
     self-all = {

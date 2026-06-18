@@ -18,8 +18,8 @@ module "vpc" {
   manage_default_route_table    = false
   manage_default_security_group = false
 
-  enable_nat_gateway = false
-  # single_nat_gateway = true
+  enable_nat_gateway = true
+  single_nat_gateway = true
 
   enable_vpn_gateway = false
 
